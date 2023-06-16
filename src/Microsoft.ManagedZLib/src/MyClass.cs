@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Experiment
+namespace Microsoft.ManagedZLib
 {
     public class MyClass
     {
