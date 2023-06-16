@@ -1,14 +1,15 @@
-using System;
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
 using Xunit;
 
-namespace Microsoft.ManagedZLib.Tests
+namespace Microsoft.ManagedZLib.Tests;
+
+public class ManagedZLibTests
 {
-    public class MyClassTests
+    [Fact]
+    public void Test1()
     {
-        [Fact]
-        public void Test1()
-        {
-            Assert.True(MyClass.ReturnTrue);
-        }
+        Assert.True(true);
     }
 }
