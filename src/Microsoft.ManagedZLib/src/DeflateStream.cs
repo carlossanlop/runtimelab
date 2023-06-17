@@ -6,7 +6,6 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -513,16 +512,9 @@ public partial class DeflateStream : Stream
         // Write compressed the bytes we already passed to the deflater:
         WriteDeflaterOutput();
 
-        unsafe
-        {
-            // Pass new bytes through deflater and write them too:
-            fixed (byte* bufferPtr = &MemoryMarshal.GetReference(buffer))
-            {
-                _deflater.SetInput(bufferPtr, buffer.Length);
-                WriteDeflaterOutput();
-                _wroteBytes = true;
-            }
-        }
+        _deflater.SetInput(buffer);
+        WriteDeflaterOutput();
+        _wroteBytes = true;
     }
 
     private void WriteDeflaterOutput()
@@ -808,7 +800,7 @@ public partial class DeflateStream : Stream
 
                 Debug.Assert(_deflater != null);
                 // Pass new bytes through deflater
-                _deflater.SetInput(buffer);
+                _deflater.SetInput(buffer.Span);
 
                 await WriteDeflaterOutputAsync(cancellationToken).ConfigureAwait(false);
 

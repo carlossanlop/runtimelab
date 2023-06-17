@@ -13,7 +13,7 @@ public class ZLibException : IOException
 {
     private readonly string? _zlibErrorContext = string.Empty;
     private readonly string? _zlibErrorMessage = string.Empty;
-    private readonly ManagedZLib.ErrorCode _zlibErrorCode = ManagedZLib.ErrorCode.Ok;
+    private readonly ZLibErrorCode _zlibErrorCode = ZLibErrorCode.Ok;
 
     /// <summary>
     /// This is the preferred constructor to use.
@@ -26,7 +26,7 @@ public class ZLibException : IOException
     public ZLibException(string? message, string? zlibErrorContext, int zlibErrorCode, string? zlibErrorMessage) : base(message)
     {
         _zlibErrorContext = zlibErrorContext;
-        _zlibErrorCode = (ManagedZLib.ErrorCode)zlibErrorCode;
+        _zlibErrorCode = (ZLibErrorCode)zlibErrorCode;
         _zlibErrorMessage = zlibErrorMessage;
     }
 

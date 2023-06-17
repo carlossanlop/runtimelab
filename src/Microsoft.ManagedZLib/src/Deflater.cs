@@ -12,7 +12,7 @@ namespace Microsoft.ManagedZLib;
 /// </summary>
 internal sealed class Deflater : IDisposable
 {
-    private readonly ManagedZLib.ZLibStreamHandle _zlibStream;
+    private readonly ZLibStreamHandle _zlibStream;
     private MemoryHandle _inputBufferHandle;
     private bool _isDisposed;
     private const int minWindowBits = -15;  // WindowBits must be between -8..-15 to write no header, 8..15 for a
@@ -28,7 +28,7 @@ internal sealed class Deflater : IDisposable
     internal Deflater(CompressionLevel compressionLevel, int windowBits)
     {
         Debug.Assert(windowBits >= minWindowBits && windowBits <= maxWindowBits);
-        ManagedZLib.CompressionLevel zlibCompressionLevel;
+        ZLibCompressionLevel zlibCompressionLevel;
         int memLevel;
 
         switch (compressionLevel)
@@ -36,22 +36,22 @@ internal sealed class Deflater : IDisposable
             // See the note in ZLibNative.CompressionLevel for the recommended combinations.
 
             case CompressionLevel.Optimal:
-                zlibCompressionLevel = ManagedZLib.CompressionLevel.DefaultCompression;
+                zlibCompressionLevel = ZLibCompressionLevel.DefaultCompression;
                 memLevel = ManagedZLib.Deflate_DefaultMemLevel;
                 break;
 
             case CompressionLevel.Fastest:
-                zlibCompressionLevel = ManagedZLib.CompressionLevel.BestSpeed;
+                zlibCompressionLevel = ZLibCompressionLevel.BestSpeed;
                 memLevel = ManagedZLib.Deflate_DefaultMemLevel;
                 break;
 
             case CompressionLevel.NoCompression:
-                zlibCompressionLevel = ManagedZLib.CompressionLevel.NoCompression;
+                zlibCompressionLevel = ZLibCompressionLevel.NoCompression;
                 memLevel = ManagedZLib.Deflate_NoCompressionMemLevel;
                 break;
 
             case CompressionLevel.SmallestSize:
-                zlibCompressionLevel = ManagedZLib.CompressionLevel.BestCompression;
+                zlibCompressionLevel = ZLibCompressionLevel.BestCompression;
                 memLevel = ManagedZLib.Deflate_DefaultMemLevel;
                 break;
 
@@ -59,9 +59,9 @@ internal sealed class Deflater : IDisposable
                 throw new ArgumentOutOfRangeException(nameof(compressionLevel));
         }
 
-        ManagedZLib.CompressionStrategy strategy = ManagedZLib.CompressionStrategy.DefaultStrategy;
+        ZLibCompressionStrategy strategy = ZLibCompressionStrategy.DefaultStrategy;
 
-        Microsoft.ManagedZLib.ManagedZLib.ErrorCode errC;
+        ZLibErrorCode errC;
         try
         {
             errC = ManagedZLib.CreateZLibStreamForDeflate(out _zlibStream, zlibCompressionLevel,
@@ -74,16 +74,16 @@ internal sealed class Deflater : IDisposable
 
         switch (errC)
         {
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.Ok:
+            case ZLibErrorCode.Ok:
                 return;
 
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.MemError:
+            case ZLibErrorCode.MemError:
                 throw new ZLibException("SR.ZLibErrorNotEnoughMemory", "deflateInit2_", (int)errC, _zlibStream.GetErrorMessage());
 
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.VersionError:
+            case ZLibErrorCode.VersionError:
                 throw new ZLibException("SR.ZLibErrorVersionMismatch", "deflateInit2_", (int)errC, _zlibStream.GetErrorMessage());
 
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.StreamError:
+            case ZLibErrorCode.StreamError:
                 throw new ZLibException("SR.ZLibErrorIncorrectInitParameters", "deflateInit2_", (int)errC, _zlibStream.GetErrorMessage());
 
             default:
@@ -116,7 +116,7 @@ internal sealed class Deflater : IDisposable
 
     public bool NeedsInput() => 0 == _zlibStream.AvailIn;
 
-    internal void SetInput(ReadOnlyMemory<byte> inputBuffer)
+    internal void SetInput(ReadOnlySpan<byte> inputBuffer)
     {
         Debug.Assert(NeedsInput(), "We have something left in previous input!");
         if (0 == inputBuffer.Length)
@@ -126,29 +126,29 @@ internal sealed class Deflater : IDisposable
 
         lock (SyncLock)
         {
-            _inputBufferHandle = inputBuffer.Pin();
+            //_inputBufferHandle = inputBuffer.Pin();
 
-            _zlibStream.NextIn = (IntPtr)_inputBufferHandle.Pointer;
-            _zlibStream.AvailIn = (uint)inputBuffer.Length;
+            //_zlibStream.NextIn = (IntPtr)_inputBufferHandle.Pointer;
+            //_zlibStream.AvailIn = (uint)inputBuffer.Length;
         }
     }
 
-    internal void SetInput(byte* inputBufferPtr, int count)
-    {
-        Debug.Assert(NeedsInput(), "We have something left in previous input!");
-        Debug.Assert(inputBufferPtr != null);
+    //internal void SetInput(byte* inputBufferPtr, int count)
+    //{
+    //    Debug.Assert(NeedsInput(), "We have something left in previous input!");
+    //    Debug.Assert(inputBufferPtr != null);
 
-        if (count == 0)
-        {
-            return;
-        }
+    //    if (count == 0)
+    //    {
+    //        return;
+    //    }
 
-        lock (SyncLock)
-        {
-            _zlibStream.NextIn = (IntPtr)inputBufferPtr;
-            _zlibStream.AvailIn = (uint)count;
-        }
-    }
+    //    lock (SyncLock)
+    //    {
+    //        _zlibStream.NextIn = (IntPtr)inputBufferPtr;
+    //        _zlibStream.AvailIn = (uint)count;
+    //    }
+    //}
 
     internal int GetDeflateOutput(byte[] outputBuffer)
     {
@@ -158,7 +158,7 @@ internal sealed class Deflater : IDisposable
         try
         {
             int bytesRead;
-            ReadDeflateOutput(outputBuffer, Microsoft.ManagedZLib.ManagedZLib.FlushCode.NoFlush, out bytesRead);
+            ReadDeflateOutput(outputBuffer, ZLibFlushCode.NoFlush, out bytesRead);
             return bytesRead;
         }
         finally
@@ -171,23 +171,26 @@ internal sealed class Deflater : IDisposable
         }
     }
 
-    private Microsoft.ManagedZLib.ManagedZLib.ErrorCode ReadDeflateOutput(byte[] outputBuffer, Microsoft.ManagedZLib.ManagedZLib.FlushCode flushCode, out int bytesRead)
+    private ZLibErrorCode ReadDeflateOutput(byte[] outputBuffer, ZLibFlushCode flushCode, out int bytesRead)
     {
         Debug.Assert(outputBuffer?.Length > 0);
 
         lock (SyncLock)
         {
-            fixed (byte* bufPtr = &outputBuffer[0])
-            {
-                _zlibStream.NextOut = (IntPtr)bufPtr;
-                _zlibStream.AvailOut = (uint)outputBuffer.Length;
+            //fixed (byte* bufPtr = &outputBuffer[0])
+            //{
+            //    _zlibStream.NextOut = (IntPtr)bufPtr;
+            //    _zlibStream.AvailOut = (uint)outputBuffer.Length;
 
-                Microsoft.ManagedZLib.ManagedZLib.ErrorCode errC = Deflate(flushCode);
-                bytesRead = outputBuffer.Length - (int)_zlibStream.AvailOut;
+            //    ZLibErrorCode errC = Deflate(flushCode);
+            //    bytesRead = outputBuffer.Length - (int)_zlibStream.AvailOut;
 
-                return errC;
-            }
+            //    return errC;
+            //}
         }
+        // TEMP
+        bytesRead = 0;
+        return ZLibErrorCode.Ok;
     }
 
     internal bool Finish(byte[] outputBuffer, out int bytesRead)
@@ -195,8 +198,8 @@ internal sealed class Deflater : IDisposable
         Debug.Assert(null != outputBuffer, "Can't pass in a null output buffer!");
         Debug.Assert(outputBuffer.Length > 0, "Can't pass in an empty output buffer!");
 
-        Microsoft.ManagedZLib.ManagedZLib.ErrorCode errC = ReadDeflateOutput(outputBuffer, Microsoft.ManagedZLib.ManagedZLib.FlushCode.Finish, out bytesRead);
-        return errC == Microsoft.ManagedZLib.ManagedZLib.ErrorCode.StreamEnd;
+        ZLibErrorCode errC = ReadDeflateOutput(outputBuffer, ZLibFlushCode.Finish, out bytesRead);
+        return errC == ZLibErrorCode.StreamEnd;
     }
 
     /// <summary>
@@ -213,7 +216,7 @@ internal sealed class Deflater : IDisposable
         // If there is still input left we should never be getting here; instead we
         // should be calling GetDeflateOutput.
 
-        return ReadDeflateOutput(outputBuffer, Microsoft.ManagedZLib.ManagedZLib.FlushCode.SyncFlush, out bytesRead) == Microsoft.ManagedZLib.ManagedZLib.ErrorCode.Ok;
+        return ReadDeflateOutput(outputBuffer, ZLibFlushCode.SyncFlush, out bytesRead) == ZLibErrorCode.Ok;
     }
 
     private void DeallocateInputBufferHandle()
@@ -226,9 +229,9 @@ internal sealed class Deflater : IDisposable
         }
     }
 
-    private Microsoft.ManagedZLib.ManagedZLib.ErrorCode Deflate(Microsoft.ManagedZLib.ManagedZLib.FlushCode flushCode)
+    private ZLibErrorCode Deflate(ZLibFlushCode flushCode)
     {
-        Microsoft.ManagedZLib.ManagedZLib.ErrorCode errC;
+        ZLibErrorCode errC;
         try
         {
             errC = _zlibStream.Deflate(flushCode);
@@ -240,14 +243,14 @@ internal sealed class Deflater : IDisposable
 
         switch (errC)
         {
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.Ok:
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.StreamEnd:
+            case ZLibErrorCode.Ok:
+            case ZLibErrorCode.StreamEnd:
                 return errC;
 
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.BufError:
+            case ZLibErrorCode.BufError:
                 return errC;  // This is a recoverable error
 
-            case Microsoft.ManagedZLib.ManagedZLib.ErrorCode.StreamError:
+            case ZLibErrorCode.StreamError:
                 throw new ZLibException("SR.ZLibErrorInconsistentStream", "deflate", (int)errC, _zlibStream.GetErrorMessage());
 
             default:
